@@ -50,40 +50,41 @@ class Capybara::Driver::Mechanize < Capybara::Driver::RackTest
   
   def get(url, params = {}, headers = {})
     if remote?(url)
-      process_remote_request(:get, url, params)
+      process_remote_request(:get, url,build_request_params(params))
     else
       register_local_request
       super
     end
+  end
+
+  def build_request_params(value, prefix = nil,results = [])
+    case value
+    when Array
+      value.map { |v|
+        build_request_params(v, "#{prefix}[]",results)
+      }
+    when Hash
+      value.map { |k, v|
+        build_request_params(v, prefix ? "#{prefix}[#{k}]" : k,results)
+      }
+    when String
+      raise ArgumentError, "value must be a Hash" if prefix.nil?
+      results.push([prefix,value])
+    else
+      prefix
+    end
+    results
   end
 
   def post(url, params = {}, headers = {})
     if remote?(url)
-      process_remote_request(:post, url, post_data(params), headers)
+      process_remote_request(:post, url, build_request_params(params), headers)
     else
       register_local_request
       super
     end
   end
 
-  def post_data(params)
-    params.inject({}) do |memo, param|
-      case param
-      when Hash
-        param.each {|attribute, value| memo[attribute] = value }
-        memo
-      when Array
-        case param.last
-        when Hash
-          param.last.each {|attribute, value| memo["#{param.first}[#{attribute}]"] = value }
-        else
-          memo[param.first] = param.last
-        end
-        memo
-      end
-    end
-  end
-  
   def put(url, params = {}, headers = {})
     if remote?(url)
       process_remote_request(:put, url)
@@ -95,7 +96,7 @@ class Capybara::Driver::Mechanize < Capybara::Driver::RackTest
 
   def delete(url, params = {}, headers = {})
     if remote?(url)
-      process_remote_request(:delete, url, params, headers)
+      process_remote_request(:delete, url, build_request_params(params), headers)
     else
       register_local_request
       super
